@@ -46,6 +46,8 @@ class TransactionController extends Controller
             'date' => 'required|date',
         ]);
 
+        $validated['user_id'] = $request->user()->id;
+
         Transaction::create($validated);
 
         return redirect()->route('transactions.index')
