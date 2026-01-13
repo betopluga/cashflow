@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import CategoriesDataTable from '@/components/CategoriesDataTable.vue';
+import CategoryDialog from '@/components/CategoryDialog.vue';
 import { Button } from '@/components/ui/button';
 import { index as categoriesRoute } from '@/routes/categories';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/vue3';
 import { Plus } from 'lucide-vue-next';
+import { ref } from 'vue';
 
 interface Category {
     id: number;
@@ -26,9 +28,17 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+const dialogOpen = ref(false);
+const selectedCategory = ref<Category | null>(null);
+
 function createCategory() {
-    // TODO: Open create dialog
-    console.log('Create new category');
+    selectedCategory.value = null;
+    dialogOpen.value = true;
+}
+
+function editCategory(category: Category) {
+    selectedCategory.value = category;
+    dialogOpen.value = true;
 }
 </script>
 
@@ -50,7 +60,15 @@ function createCategory() {
                 </Button>
             </div>
 
-            <CategoriesDataTable :categories="props.categories" />
+            <CategoriesDataTable 
+                :categories="props.categories" 
+                @edit="editCategory"
+            />
         </div>
+
+        <CategoryDialog 
+            v-model:open="dialogOpen"
+            :category="selectedCategory"
+        />
     </AppLayout>
 </template>

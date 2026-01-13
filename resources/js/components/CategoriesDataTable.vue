@@ -36,6 +36,10 @@ const props = defineProps<{
     categories: Category[];
 }>();
 
+const emit = defineEmits<{
+    edit: [category: Category];
+}>();
+
 const sorting = ref<SortingState>([]);
 const columnVisibility = ref<VisibilityState>({});
 const globalFilter = ref('');
@@ -157,8 +161,7 @@ const table = useVueTable({
 });
 
 function editCategory(category: Category) {
-    // TODO: Open edit dialog
-    console.log('Edit category:', category);
+    emit('edit', category);
 }
 
 function deleteCategory(category: Category) {
