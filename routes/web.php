@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\TransactionController;
 
 Route::get('/', function () {
     return redirect()->route('login');
@@ -16,8 +17,7 @@ Route::get('dashboard', function () {
 Route::resource('categories', CategoryController::class)
     ->middleware(['auth', 'verified']);
 
-Route::get('transactions', function () {
-    return Inertia::render('Transactions');
-})->middleware(['auth', 'verified'])->name('transactions');
+Route::resource('transactions', TransactionController::class)
+    ->middleware(['auth', 'verified']);
 
 require __DIR__.'/settings.php';

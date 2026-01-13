@@ -11,8 +11,9 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { dashboard, transactions } from '@/routes';
+import { dashboard } from '@/routes';
 import { index as categories } from '@/routes/categories';
+import { index as transactions } from '@/routes/transactions';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
 import { BadgeDollarSign, NotebookPen, LayoutGrid } from 'lucide-vue-next';
