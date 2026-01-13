@@ -25,8 +25,8 @@ class Category extends Model
     /**
      * Get the transactions for this category.
      */
-    /*public function transactions()
+    public function transactions()
     {
         return $this->hasMany(Transaction::class);
-    }*/
+    }
 }
