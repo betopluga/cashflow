@@ -22,7 +22,7 @@ import {
     type VisibilityState,
 } from '@tanstack/vue-table';
 import { ArrowUpDown, ChevronDown, Pencil, Trash2 } from 'lucide-vue-next';
-import { h, ref } from 'vue';
+import { h, ref, computed } from 'vue';
 
 interface Category {
     id: number;
@@ -39,6 +39,9 @@ const props = defineProps<{
 const emit = defineEmits<{
     edit: [category: Category];
 }>();
+
+// Make data reactive by using computed
+const data = computed(() => props.categories);
 
 const sorting = ref<SortingState>([]);
 const columnVisibility = ref<VisibilityState>({});
@@ -123,7 +126,9 @@ const columns: ColumnDef<Category>[] = [
 ];
 
 const table = useVueTable({
-    data: props.categories,
+    get data() {
+        return data.value;
+    },
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
