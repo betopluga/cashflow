@@ -17,8 +17,26 @@ interface Category {
     created_at: string;
 }
 
+interface PaginatedCategories {
+    data: Category[];
+    current_page: number;
+    per_page: number;
+    total: number;
+    last_page: number;
+    from: number;
+    to: number;
+}
+
+interface Filters {
+    search?: string;
+    sort?: string;
+    direction?: string;
+    per_page?: number;
+}
+
 const props = defineProps<{
-    categories: Category[];
+    categories: PaginatedCategories;
+    filters?: Filters;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [

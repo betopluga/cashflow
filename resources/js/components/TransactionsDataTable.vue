@@ -13,16 +13,11 @@ import { router } from '@inertiajs/vue3';
 import {
     FlexRender,
     getCoreRowModel,
-    getFilteredRowModel,
-    getPaginationRowModel,
-    getSortedRowModel,
     useVueTable,
     type ColumnDef,
-    type SortingState,
-    type VisibilityState,
 } from '@tanstack/vue-table';
 import { ArrowUpDown, Pencil, Trash2 } from 'lucide-vue-next';
-import { h, ref, computed } from 'vue';
+import { h, ref, computed, watch } from 'vue';
 
 interface Transaction {
     id: number;
@@ -36,37 +31,99 @@ interface Transaction {
     };
 }
 
+interface PaginatedData {
+    data: Transaction[];
+    current_page: number;
+    per_page: number;
+    total: number;
+    last_page: number;
+    from: number;
+    to: number;
+}
+
+interface Filters {
+    search?: string;
+    sort?: string;
+    direction?: string;
+    per_page?: number;
+}
+
 const props = defineProps<{
-    transactions: Transaction[];
+    transactions: PaginatedData;
+    filters?: Filters;
 }>();
 
 const emit = defineEmits<{
     edit: [transaction: Transaction];
 }>();
 
-const data = computed(() => props.transactions);
+const data = computed(() => props.transactions.data);
+const search = ref(props.filters?.search || '');
+const sortBy = ref(props.filters?.sort || 'date');
+const sortDirection = ref(props.filters?.direction || 'desc');
+const perPage = ref(props.filters?.per_page || 10);
 
-const sorting = ref<SortingState>([]);
-const columnVisibility = ref<VisibilityState>({});
-const globalFilter = ref('');
+// Debounced search function
+let searchTimeout: ReturnType<typeof setTimeout>;
+watch(search, (value) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        updateFilters();
+    }, 300);
+});
+
+function updateFilters() {
+    router.get('/transactions', {
+        search: search.value || undefined,
+        sort: sortBy.value,
+        direction: sortDirection.value,
+        per_page: perPage.value,
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+    });
+}
+
+function toggleSort(column: string) {
+    if (sortBy.value === column) {
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortBy.value = column;
+        sortDirection.value = 'asc';
+    }
+    updateFilters();
+}
+
+function changePage(page: number) {
+    router.get('/transactions', {
+        page,
+        search: search.value || undefined,
+        sort: sortBy.value,
+        direction: sortDirection.value,
+        per_page: perPage.value,
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+    });
+}
 
 const columns: ColumnDef<Transaction>[] = [
     {
         accessorKey: 'date',
-        header: ({ column }) => {
+        header: () => {
             return h(
                 Button,
                 {
                     variant: 'ghost',
-                    onClick: () =>
-                        column.toggleSorting(column.getIsSorted() === 'asc'),
+                    onClick: () => toggleSort('date'),
                 },
                 () => ['Date', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
             );
         },
         cell: ({ row }) => {
-            const date = new Date(row.getValue('date'));
-            return h('div', { class: 'font-medium' }, date.toLocaleDateString());
+            let dateString = row.getValue('date') as string;
+            dateString = dateString.split('T')[0];
+            return h('div', { class: 'font-medium' }, dateString);
         },
     },
     {
@@ -96,13 +153,12 @@ const columns: ColumnDef<Transaction>[] = [
     },
     {
         accessorKey: 'amount',
-        header: ({ column }) => {
+        header: () => {
             return h(
                 Button,
                 {
                     variant: 'ghost',
-                    onClick: () =>
-                        column.toggleSorting(column.getIsSorted() === 'asc'),
+                    onClick: () => toggleSort('amount'),
                 },
                 () => ['Amount', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
             );
@@ -163,38 +219,10 @@ const table = useVueTable({
     },
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onSortingChange: (updaterOrValue) => {
-        sorting.value =
-            typeof updaterOrValue === 'function'
-                ? updaterOrValue(sorting.value)
-                : updaterOrValue;
-    },
-    onColumnVisibilityChange: (updaterOrValue) => {
-        columnVisibility.value =
-            typeof updaterOrValue === 'function'
-                ? updaterOrValue(columnVisibility.value)
-                : updaterOrValue;
-    },
-    onGlobalFilterChange: (updaterOrValue) => {
-        globalFilter.value =
-            typeof updaterOrValue === 'function'
-                ? updaterOrValue(globalFilter.value)
-                : updaterOrValue;
-    },
-    state: {
-        get sorting() {
-            return sorting.value;
-        },
-        get columnVisibility() {
-            return columnVisibility.value;
-        },
-        get globalFilter() {
-            return globalFilter.value;
-        },
-    },
+    manualPagination: true,
+    manualSorting: true,
+    manualFiltering: true,
+    pageCount: props.transactions.last_page,
 });
 
 function editTransaction(transaction: Transaction) {
@@ -215,7 +243,7 @@ function deleteTransaction(transaction: Transaction) {
         <div class="flex items-center justify-between gap-4">
             <Input
                 placeholder="Search transactions..."
-                v-model="globalFilter"
+                v-model="search"
                 class="max-w-sm"
             />
         </div>
@@ -273,24 +301,27 @@ function deleteTransaction(transaction: Transaction) {
             </Table>
         </div>
 
-        <div class="flex items-center justify-end space-x-2">
+        <div class="flex items-center justify-between space-x-2">
             <div class="flex-1 text-sm text-muted-foreground">
-                {{ table.getFilteredRowModel().rows.length }} transaction(s)
+                Showing {{ props.transactions.from || 0 }} to {{ props.transactions.to || 0 }} of {{ props.transactions.total }} transaction(s)
             </div>
             <div class="space-x-2">
                 <Button
                     variant="outline"
                     size="sm"
-                    :disabled="!table.getCanPreviousPage()"
-                    @click="table.previousPage()"
+                    :disabled="props.transactions.current_page === 1"
+                    @click="changePage(props.transactions.current_page - 1)"
                 >
                     Previous
                 </Button>
+                <span class="text-sm text-muted-foreground">
+                    Page {{ props.transactions.current_page }} of {{ props.transactions.last_page }}
+                </span>
                 <Button
                     variant="outline"
                     size="sm"
-                    :disabled="!table.getCanNextPage()"
-                    @click="table.nextPage()"
+                    :disabled="props.transactions.current_page === props.transactions.last_page"
+                    @click="changePage(props.transactions.current_page + 1)"
                 >
                     Next
                 </Button>

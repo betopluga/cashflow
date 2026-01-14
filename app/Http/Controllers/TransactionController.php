@@ -12,17 +12,35 @@ class TransactionController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $transactions = Transaction::with(['user', 'category'])
-            ->latest('date')
-            ->get();
+        $query = Transaction::with(['user', 'category']);
+
+        // Handle search
+        if ($request->has('search') && $request->search) {
+            $query->where(function ($q) use ($request) {
+                $q->where('description', 'like', '%' . $request->search . '%')
+                  ->orWhereHas('category', function ($q) use ($request) {
+                      $q->where('name', 'like', '%' . $request->search . '%');
+                  });
+            });
+        }
+
+        // Handle sorting
+        $sortBy = $request->get('sort', 'date');
+        $sortDirection = $request->get('direction', 'desc');
+        $query->orderBy($sortBy, $sortDirection);
+
+        // Paginate results
+        $perPage = $request->get('per_page', 10);
+        $transactions = $query->paginate($perPage)->withQueryString();
 
         $categories = Category::all();
 
         return Inertia::render('Transactions', [
             'transactions' => $transactions,
             'categories' => $categories,
+            'filters' => $request->only(['search', 'sort', 'direction', 'per_page']),
         ]);
     }
 

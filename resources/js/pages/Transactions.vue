@@ -24,9 +24,27 @@ interface Transaction {
     category?: Category;
 }
 
+interface PaginatedTransactions {
+    data: Transaction[];
+    current_page: number;
+    per_page: number;
+    total: number;
+    last_page: number;
+    from: number;
+    to: number;
+}
+
+interface Filters {
+    search?: string;
+    sort?: string;
+    direction?: string;
+    per_page?: number;
+}
+
 const props = defineProps<{
-    transactions: Transaction[];
+    transactions: PaginatedTransactions;
     categories: Category[];
+    filters?: Filters;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [

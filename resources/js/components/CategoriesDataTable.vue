@@ -13,16 +13,11 @@ import { router } from '@inertiajs/vue3';
 import {
     FlexRender,
     getCoreRowModel,
-    getFilteredRowModel,
-    getPaginationRowModel,
-    getSortedRowModel,
     useVueTable,
     type ColumnDef,
-    type SortingState,
-    type VisibilityState,
 } from '@tanstack/vue-table';
-import { ArrowUpDown, ChevronDown, Pencil, Trash2 } from 'lucide-vue-next';
-import { h, ref, computed } from 'vue';
+import { ArrowUpDown, Pencil, Trash2 } from 'lucide-vue-next';
+import { h, ref, computed, watch } from 'vue';
 
 interface Category {
     id: number;
@@ -32,31 +27,91 @@ interface Category {
     created_at: string;
 }
 
+interface PaginatedData {
+    data: Category[];
+    current_page: number;
+    per_page: number;
+    total: number;
+    last_page: number;
+    from: number;
+    to: number;
+}
+
+interface Filters {
+    search?: string;
+    sort?: string;
+    direction?: string;
+    per_page?: number;
+}
+
 const props = defineProps<{
-    categories: Category[];
+    categories: PaginatedData;
+    filters?: Filters;
 }>();
 
 const emit = defineEmits<{
     edit: [category: Category];
 }>();
 
-// Make data reactive by using computed
-const data = computed(() => props.categories);
+const data = computed(() => props.categories.data);
+const search = ref(props.filters?.search || '');
+const sortBy = ref(props.filters?.sort || 'created_at');
+const sortDirection = ref(props.filters?.direction || 'desc');
+const perPage = ref(props.filters?.per_page || 10);
 
-const sorting = ref<SortingState>([]);
-const columnVisibility = ref<VisibilityState>({});
-const globalFilter = ref('');
+// Debounced search function
+let searchTimeout: ReturnType<typeof setTimeout>;
+watch(search, (value) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        updateFilters();
+    }, 300);
+});
+
+function updateFilters() {
+    router.get('/categories', {
+        search: search.value || undefined,
+        sort: sortBy.value,
+        direction: sortDirection.value,
+        per_page: perPage.value,
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+    });
+}
+
+function toggleSort(column: string) {
+    if (sortBy.value === column) {
+        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortBy.value = column;
+        sortDirection.value = 'asc';
+    }
+    updateFilters();
+}
+
+function changePage(page: number) {
+    router.get('/categories', {
+        page,
+        search: search.value || undefined,
+        sort: sortBy.value,
+        direction: sortDirection.value,
+        per_page: perPage.value,
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+    });
+}
 
 const columns: ColumnDef<Category>[] = [
     {
         accessorKey: 'name',
-        header: ({ column }) => {
+        header: () => {
             return h(
                 Button,
                 {
                     variant: 'ghost',
-                    onClick: () =>
-                        column.toggleSorting(column.getIsSorted() === 'asc'),
+                    onClick: () => toggleSort('name'),
                 },
                 () => ['Name', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
             );
@@ -70,13 +125,12 @@ const columns: ColumnDef<Category>[] = [
     },
     {
         accessorKey: 'type',
-        header: ({ column }) => {
+        header: () => {
             return h(
                 Button,
                 {
                     variant: 'ghost',
-                    onClick: () =>
-                        column.toggleSorting(column.getIsSorted() === 'asc'),
+                    onClick: () => toggleSort('type'),
                 },
                 () => ['Type', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
             );
@@ -131,38 +185,10 @@ const table = useVueTable({
     },
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onSortingChange: (updaterOrValue) => {
-        sorting.value =
-            typeof updaterOrValue === 'function'
-                ? updaterOrValue(sorting.value)
-                : updaterOrValue;
-    },
-    onColumnVisibilityChange: (updaterOrValue) => {
-        columnVisibility.value =
-            typeof updaterOrValue === 'function'
-                ? updaterOrValue(columnVisibility.value)
-                : updaterOrValue;
-    },
-    onGlobalFilterChange: (updaterOrValue) => {
-        globalFilter.value =
-            typeof updaterOrValue === 'function'
-                ? updaterOrValue(globalFilter.value)
-                : updaterOrValue;
-    },
-    state: {
-        get sorting() {
-            return sorting.value;
-        },
-        get columnVisibility() {
-            return columnVisibility.value;
-        },
-        get globalFilter() {
-            return globalFilter.value;
-        },
-    },
+    manualPagination: true,
+    manualSorting: true,
+    manualFiltering: true,
+    pageCount: props.categories.last_page,
 });
 
 function editCategory(category: Category) {
@@ -183,7 +209,7 @@ function deleteCategory(category: Category) {
         <div class="flex items-center justify-between gap-4">
             <Input
                 placeholder="Search categories..."
-                v-model="globalFilter"
+                v-model="search"
                 class="max-w-sm"
             />
         </div>
@@ -241,24 +267,27 @@ function deleteCategory(category: Category) {
             </Table>
         </div>
 
-        <div class="flex items-center justify-end space-x-2">
+        <div class="flex items-center justify-between space-x-2">
             <div class="flex-1 text-sm text-muted-foreground">
-                {{ table.getFilteredRowModel().rows.length }} category(ies)
+                Showing {{ props.categories.from || 0 }} to {{ props.categories.to || 0 }} of {{ props.categories.total }} category(ies)
             </div>
             <div class="space-x-2">
                 <Button
                     variant="outline"
                     size="sm"
-                    :disabled="!table.getCanPreviousPage()"
-                    @click="table.previousPage()"
+                    :disabled="props.categories.current_page === 1"
+                    @click="changePage(props.categories.current_page - 1)"
                 >
                     Previous
                 </Button>
+                <span class="text-sm text-muted-foreground">
+                    Page {{ props.categories.current_page }} of {{ props.categories.last_page }}
+                </span>
                 <Button
                     variant="outline"
                     size="sm"
-                    :disabled="!table.getCanNextPage()"
-                    @click="table.nextPage()"
+                    :disabled="props.categories.current_page === props.categories.last_page"
+                    @click="changePage(props.categories.current_page + 1)"
                 >
                     Next
                 </Button>
