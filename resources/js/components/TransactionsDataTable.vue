@@ -46,6 +46,8 @@ interface Filters {
     sort?: string;
     direction?: string;
     per_page?: number;
+    date_from?: string;
+    date_to?: string;
 }
 
 const props = defineProps<{
@@ -57,11 +59,24 @@ const emit = defineEmits<{
     edit: [transaction: Transaction];
 }>();
 
+// Helper functions to get current month's first and last day
+function getFirstDayOfMonth() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+}
+
+function getLastDayOfMonth() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+}
+
 const data = computed(() => props.transactions.data);
 const search = ref(props.filters?.search || '');
 const sortBy = ref(props.filters?.sort || 'date');
 const sortDirection = ref(props.filters?.direction || 'desc');
 const perPage = ref(props.filters?.per_page || 10);
+const dateFrom = ref(props.filters?.date_from || getFirstDayOfMonth());
+const dateTo = ref(props.filters?.date_to || getLastDayOfMonth());
 
 // Debounced search function
 let searchTimeout: ReturnType<typeof setTimeout>;
@@ -72,12 +87,18 @@ watch(search, (value) => {
     }, 300);
 });
 
+// Watch date filters
+watch(dateFrom, () => updateFilters());
+watch(dateTo, () => updateFilters());
+
 function updateFilters() {
     router.get('/transactions', {
         search: search.value || undefined,
         sort: sortBy.value,
         direction: sortDirection.value,
         per_page: perPage.value,
+        date_from: dateFrom.value || undefined,
+        date_to: dateTo.value || undefined,
     }, {
         preserveState: true,
         preserveScroll: true,
@@ -101,6 +122,8 @@ function changePage(page: number) {
         sort: sortBy.value,
         direction: sortDirection.value,
         per_page: perPage.value,
+        date_from: dateFrom.value || undefined,
+        date_to: dateTo.value || undefined,
     }, {
         preserveState: true,
         preserveScroll: true,
@@ -240,12 +263,27 @@ function deleteTransaction(transaction: Transaction) {
 
 <template>
     <div class="w-full space-y-4">
-        <div class="flex items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
             <Input
                 placeholder="Search transactions..."
                 v-model="search"
                 class="max-w-sm"
             />
+            <div class="flex items-center gap-2">
+                <Input
+                    type="date"
+                    v-model="dateFrom"
+                    placeholder="From date"
+                    class="w-40"
+                />
+                <span class="text-muted-foreground">to</span>
+                <Input
+                    type="date"
+                    v-model="dateTo"
+                    placeholder="To date"
+                    class="w-40"
+                />
+            </div>
         </div>
 
         <div class="rounded-md border">

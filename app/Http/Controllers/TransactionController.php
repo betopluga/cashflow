@@ -26,6 +26,14 @@ class TransactionController extends Controller
             });
         }
 
+        // Handle date range filtering
+        if ($request->has('date_from') && $request->date_from) {
+            $query->whereDate('date', '>=', $request->date_from);
+        }
+        if ($request->has('date_to') && $request->date_to) {
+            $query->whereDate('date', '<=', $request->date_to);
+        }
+
         // Handle sorting
         $sortBy = $request->get('sort', 'date');
         $sortDirection = $request->get('direction', 'desc');
@@ -40,7 +48,7 @@ class TransactionController extends Controller
         return Inertia::render('Transactions', [
             'transactions' => $transactions,
             'categories' => $categories,
-            'filters' => $request->only(['search', 'sort', 'direction', 'per_page']),
+            'filters' => $request->only(['search', 'sort', 'direction', 'per_page', 'date_from', 'date_to']),
         ]);
     }
 
