@@ -20,6 +20,12 @@ Route::resource('categories', CategoryController::class)
 Route::get('transactions/totals', [TransactionController::class, 'totals'])
     ->middleware(['auth', 'verified']);
 
+Route::get('transactions/years', [TransactionController::class, 'years'])
+    ->middleware(['auth', 'verified']);
+
+Route::get('transactions/graph', [TransactionController::class, 'graphByYear'])
+    ->middleware(['auth', 'verified']);
+
 Route::resource('transactions', TransactionController::class)
     ->middleware(['auth', 'verified']);
 

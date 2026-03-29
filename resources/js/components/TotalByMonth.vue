@@ -38,18 +38,18 @@ onMounted(fetchTotals);
 </script>
 
 <template>
-    <div class="flex h-full flex-col justify-between p-4">
-        <!-- Title -->
-        <h3 class="mb-5 text-sm font-medium text-neutral-700 dark:text-neutral-200">
-            Monthly Summary
-        </h3>
-        
-        <!-- Month picker -->
-        <input
-            v-model="monthValue"
-            type="month"
-            class="w-full mb-2 rounded-md border border-neutral-200 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:border-neutral-700 dark:text-neutral-100"
-        />
+    <div class="flex h-full flex-col p-4">
+        <!-- Title + Month picker -->
+        <div class="mb-3 flex items-center gap-3">
+            <h3 class="text-sm font-medium text-neutral-700 dark:text-neutral-200">
+                Monthly Summary
+            </h3>
+            <input
+                v-model="monthValue"
+                type="month"
+                class="rounded-md border border-neutral-200 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:border-neutral-700 dark:text-neutral-100"
+            />
+        </div>
 
         <!-- Spinner -->
         <div v-if="loading" class="flex flex-1 items-center justify-center">

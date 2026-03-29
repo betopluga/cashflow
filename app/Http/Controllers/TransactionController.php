@@ -150,4 +150,45 @@ class TransactionController extends Controller
             'expenses' => round((float) ($totals['expense'] ?? 0), 2),
         ]);
     }
+
+    /**
+     * Return distinct years that have transactions.
+     */
+    public function years()
+    {
+        $years = Transaction::get(['date'])
+            ->map(fn($t) => (int) $t->date->format('Y'))
+            ->unique()
+            ->sortDesc()
+            ->values();
+
+        return response()->json($years);
+    }
+
+    /**
+     * Return monthly income and expenses for a given year.
+     */
+    public function graphByYear(Request $request)
+    {
+        $year = $request->integer('year', now()->year);
+
+        $grouped = Transaction::with('category')
+            ->whereYear('date', $year)
+            ->get()
+            ->groupBy(fn($t) => (int) $t->date->format('n'));
+
+        $months = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $group   = $grouped->get($m, collect());
+            $income  = $group->filter(fn($t) => $t->category?->type === 'income')->sum('amount');
+            $expense = $group->filter(fn($t) => $t->category?->type === 'expense')->sum('amount');
+            $months[] = [
+                'month'    => $m,
+                'income'   => round((float) $income,  2),
+                'expenses' => round((float) $expense, 2),
+            ];
+        }
+
+        return response()->json($months);
+    }
 }
