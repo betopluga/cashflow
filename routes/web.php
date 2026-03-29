@@ -17,6 +17,9 @@ Route::get('dashboard', function () {
 Route::resource('categories', CategoryController::class)
     ->middleware(['auth', 'verified']);
 
+Route::get('transactions/totals', [TransactionController::class, 'totals'])
+    ->middleware(['auth', 'verified']);
+
 Route::resource('transactions', TransactionController::class)
     ->middleware(['auth', 'verified']);
 

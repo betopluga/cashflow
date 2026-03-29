@@ -129,4 +129,25 @@ class TransactionController extends Controller
         return redirect()->route('transactions.index')
             ->with('success', 'Transaction deleted successfully.');
     }
+
+    /**
+     * Return total income and expenses for a given month/year.
+     */
+    public function totals(Request $request)
+    {
+        $month = $request->integer('month', now()->month);
+        $year  = $request->integer('year',  now()->year);
+
+        $totals = Transaction::join('categories', 'categories.id', '=', 'transactions.category_id')
+            ->whereMonth('transactions.date', $month)
+            ->whereYear('transactions.date', $year)
+            ->selectRaw('categories.type, SUM(transactions.amount) as total')
+            ->groupBy('categories.type')
+            ->pluck('total', 'type');
+
+        return response()->json([
+            'income'   => round((float) ($totals['income']   ?? 0), 2),
+            'expenses' => round((float) ($totals['expense'] ?? 0), 2),
+        ]);
+    }
 }
