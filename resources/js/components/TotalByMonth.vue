@@ -39,17 +39,22 @@ onMounted(fetchTotals);
 
 <template>
     <div class="flex h-full flex-col justify-between p-4">
+        <!-- Title -->
+        <h3 class="mb-5 text-sm font-medium text-neutral-700 dark:text-neutral-200">
+            Monthly Summary
+        </h3>
+        
         <!-- Month picker -->
         <input
             v-model="monthValue"
             type="month"
-            class="w-full rounded-md border border-neutral-200 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:border-neutral-700 dark:text-neutral-100"
+            class="w-full mb-2 rounded-md border border-neutral-200 bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-neutral-400 dark:border-neutral-700 dark:text-neutral-100"
         />
 
         <!-- Spinner -->
         <div v-if="loading" class="flex flex-1 items-center justify-center">
             <svg
-                class="size-6 animate-spin text-neutral-400"
+                class="h-6 w-6 animate-spin text-neutral-400"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -82,9 +87,9 @@ onMounted(fetchTotals);
             </div>
             <div class="mt-1 border-t border-neutral-200 pt-2 dark:border-neutral-700">
                 <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-neutral-700 dark:text-neutral-200">Balance</span>
+                    <span class="text-sm font-lg text-neutral-700 dark:text-neutral-200">Balance</span>
                     <span
-                        class="font-bold"
+                        class="font-bold text-lg"
                         :class="balance() >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
                     >{{ fmt(balance()) }}</span>
                 </div>
