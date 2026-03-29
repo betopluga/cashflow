@@ -26,6 +26,9 @@ Route::get('transactions/years', [TransactionController::class, 'years'])
 Route::get('transactions/graph', [TransactionController::class, 'graphByYear'])
     ->middleware(['auth', 'verified']);
 
+Route::get('transactions/category-breakdown', [TransactionController::class, 'categoryBreakdown'])
+    ->middleware(['auth', 'verified']);
+
 Route::resource('transactions', TransactionController::class)
     ->middleware(['auth', 'verified']);
 

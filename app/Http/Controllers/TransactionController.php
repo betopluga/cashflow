@@ -191,4 +191,38 @@ class TransactionController extends Controller
 
         return response()->json($months);
     }
+
+    /**
+     * Return per-category monthly totals for a given year and category type.
+     */
+    public function categoryBreakdown(Request $request)
+    {
+        $year = $request->integer('year', now()->year);
+        $type = $request->string('type', 'expense')->toString();
+
+        $transactions = Transaction::with('category')
+            ->whereYear('date', $year)
+            ->whereHas('category', fn($q) => $q->where('type', $type))
+            ->get();
+
+        $grouped = $transactions->groupBy('category_id');
+
+        $result = $grouped->map(function ($items) {
+            $category = $items->first()->category;
+            $months   = array_fill(0, 12, 0.0);
+
+            foreach ($items as $t) {
+                $idx          = (int) $t->date->format('n') - 1;
+                $months[$idx] = round($months[$idx] + (float) $t->amount, 2);
+            }
+
+            return [
+                'id'     => $category->id,
+                'name'   => $category->name,
+                'months' => $months,
+            ];
+        })->values();
+
+        return response()->json($result);
+    }
 }
