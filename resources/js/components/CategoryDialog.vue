@@ -145,8 +145,8 @@ function handleSubmit() {
                             <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="income">Income</SelectItem>
                             <SelectItem value="expense">Expense</SelectItem>
+                            <SelectItem value="income">Income</SelectItem>
                         </SelectContent>
                     </Select>
                     <InputError :message="errors.type" />
