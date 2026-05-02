@@ -13,6 +13,7 @@ interface Category {
     id: number;
     name: string;
     type: 'income' | 'expense';
+    parent_id: number | null;
 }
 
 interface Transaction {

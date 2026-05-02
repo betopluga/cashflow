@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Transaction;
+use App\Rules\IsLeafCategory;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -43,7 +44,7 @@ class TransactionController extends Controller
         $perPage = $request->get('per_page', 10);
         $transactions = $query->paginate($perPage)->withQueryString();
 
-        $categories = Category::all();
+        $categories = Category::select('id', 'name', 'type', 'parent_id')->orderBy('name')->get();
 
         return Inertia::render('Transactions', [
             'transactions' => $transactions,
@@ -66,7 +67,7 @@ class TransactionController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'category_id' => 'nullable|exists:categories,id',
+            'category_id' => ['nullable', new IsLeafCategory],
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0.01',
             'date' => 'required|date',
@@ -106,7 +107,7 @@ class TransactionController extends Controller
     {
 
         $validated = $request->validate([
-            'category_id' => 'nullable|exists:categories,id',
+            'category_id' => ['nullable', new IsLeafCategory],
             'description' => 'required|string|max:255',
             'amount' => 'required|numeric|min:0.01',
             'date' => 'required|date',

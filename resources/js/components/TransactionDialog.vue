@@ -26,6 +26,15 @@ interface Category {
     id: number;
     name: string;
     type: 'income' | 'expense';
+    parent_id: number | null;
+}
+
+interface CategoryTreeNode {
+    id: number;
+    name: string;
+    type: 'income' | 'expense';
+    depth: number;
+    isLeaf: boolean;
 }
 
 interface Transaction {
@@ -63,6 +72,29 @@ const form = ref({
 
 const errors = ref<Record<string, string>>({});
 const processing = ref(false);
+
+const categoryTree = computed((): CategoryTreeNode[] => {
+    const childrenMap = new Map<number | null, Category[]>();
+    props.categories.forEach((cat) => {
+        const pid = cat.parent_id ?? null;
+        if (!childrenMap.has(pid)) childrenMap.set(pid, []);
+        childrenMap.get(pid)!.push(cat);
+    });
+
+    const result: CategoryTreeNode[] = [];
+
+    function traverse(parentId: number | null, depth: number) {
+        const children = childrenMap.get(parentId) ?? [];
+        children.forEach((cat) => {
+            const hasChildren = (childrenMap.get(cat.id)?.length ?? 0) > 0;
+            result.push({ id: cat.id, name: cat.name, type: cat.type, depth, isLeaf: !hasChildren });
+            traverse(cat.id, depth + 1);
+        });
+    }
+
+    traverse(null, 0);
+    return result;
+});
 
 // Watch for transaction changes to populate form
 watch(() => props.transaction, (newTransaction) => {
@@ -172,12 +204,16 @@ function handleSubmit() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem :value="null">No Category</SelectItem>
-                            <SelectItem 
-                                v-for="category in categories" 
-                                :key="category.id" 
-                                :value="category.id"
+                            <SelectItem
+                                v-for="item in categoryTree"
+                                :key="item.id"
+                                :value="item.id"
+                                :disabled="!item.isLeaf"
+                                :style="{ paddingLeft: `${0.5 + item.depth * 1.25}rem` }"
+                                :class="!item.isLeaf ? 'font-semibold opacity-75 cursor-default' : ''"
                             >
-                                {{ category.name }} ({{ category.type }})
+                                {{ item.name }}
+                                <span class="text-muted-foreground text-xs ml-1">({{ item.type }})</span>
                             </SelectItem>
                         </SelectContent>
                     </Select>
