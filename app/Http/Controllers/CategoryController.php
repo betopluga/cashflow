@@ -13,28 +13,16 @@ class CategoryController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Category::query();
+        $categories = Category::orderBy('name')
+            ->get(['id', 'name', 'description', 'type', 'parent_id', 'created_at']);
 
-        // Handle search
-        if ($request->has('search') && $request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('name', 'like', '%' . $request->search . '%')
-                  ->orWhere('description', 'like', '%' . $request->search . '%');
-            });
-        }
-
-        // Handle sorting
-        $sortBy = $request->get('sort', 'created_at');
-        $sortDirection = $request->get('direction', 'desc');
-        $query->orderBy($sortBy, $sortDirection);
-
-        // Paginate results
-        $perPage = $request->get('per_page', 10);
-        $categories = $query->paginate($perPage)->withQueryString();
+        $parentCandidates = Category::doesntHave('transactions')
+            ->orderBy('name')
+            ->get(['id', 'name', 'type', 'parent_id']);
 
         return Inertia::render('Categories', [
             'categories' => $categories,
-            'filters' => $request->only(['search', 'sort', 'direction', 'per_page']),
+            'parentCandidates' => $parentCandidates,
         ]);
     }
 
@@ -55,6 +43,15 @@ class CategoryController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
             'type' => 'required|in:income,expense',
+            'parent_id' => [
+                'nullable',
+                'exists:categories,id',
+                function ($attribute, $value, $fail) {
+                    if ($value && Category::find($value)?->transactions()->exists()) {
+                        $fail('The selected parent already has transactions and cannot be a parent.');
+                    }
+                },
+            ],
         ]);
 
         Category::create($validated);
@@ -91,6 +88,32 @@ class CategoryController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
             'type' => 'required|in:income,expense',
+            'parent_id' => [
+                'nullable',
+                'exists:categories,id',
+                function ($attribute, $value, $fail) use ($category) {
+                    if (! $value) {
+                        return;
+                    }
+                    if ((int) $value === $category->id) {
+                        $fail('A category cannot be its own parent.');
+                        return;
+                    }
+                    if (Category::find($value)?->transactions()->exists()) {
+                        $fail('The selected parent already has transactions and cannot be a parent.');
+                        return;
+                    }
+                    // Prevent circular references
+                    $current = Category::find($value);
+                    while ($current?->parent_id) {
+                        if ($current->parent_id === $category->id) {
+                            $fail('The selected parent would create a circular reference.');
+                            return;
+                        }
+                        $current = Category::find($current->parent_id);
+                    }
+                },
+            ],
         ]);
 
         $category->update($validated);

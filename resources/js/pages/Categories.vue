@@ -12,31 +12,22 @@ import { ref } from 'vue';
 interface Category {
     id: number;
     name: string;
-    description: string;
+    description: string | null;
     type: 'income' | 'expense';
+    parent_id: number | null;
     created_at: string;
 }
 
-interface PaginatedCategories {
-    data: Category[];
-    current_page: number;
-    per_page: number;
-    total: number;
-    last_page: number;
-    from: number;
-    to: number;
-}
-
-interface Filters {
-    search?: string;
-    sort?: string;
-    direction?: string;
-    per_page?: number;
+interface ParentCandidate {
+    id: number;
+    name: string;
+    type: 'income' | 'expense';
+    parent_id: number | null;
 }
 
 const props = defineProps<{
-    categories: PaginatedCategories;
-    filters?: Filters;
+    categories: Category[];
+    parentCandidates: ParentCandidate[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -87,6 +78,7 @@ function editCategory(category: Category) {
         <CategoryDialog 
             v-model:open="dialogOpen"
             :category="selectedCategory"
+            :parent-candidates="props.parentCandidates"
         />
     </AppLayout>
 </template>

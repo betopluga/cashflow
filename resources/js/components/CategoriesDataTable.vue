@@ -10,194 +10,110 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { router } from '@inertiajs/vue3';
-import {
-    FlexRender,
-    getCoreRowModel,
-    useVueTable,
-    type ColumnDef,
-} from '@tanstack/vue-table';
-import { ArrowUpDown, Pencil, Trash2 } from 'lucide-vue-next';
-import { h, ref, computed, watch } from 'vue';
+import { ChevronDown, ChevronRight, Dot, Pencil, Trash2 } from 'lucide-vue-next';
+import { computed, reactive, ref } from 'vue';
 
 interface Category {
     id: number;
     name: string;
-    description: string;
+    description: string | null;
     type: 'income' | 'expense';
+    parent_id: number | null;
     created_at: string;
 }
 
-interface PaginatedData {
-    data: Category[];
-    current_page: number;
-    per_page: number;
-    total: number;
-    last_page: number;
-    from: number;
-    to: number;
-}
-
-interface Filters {
-    search?: string;
-    sort?: string;
-    direction?: string;
-    per_page?: number;
+interface TreeNode extends Category {
+    depth: number;
+    hasChildren: boolean;
 }
 
 const props = defineProps<{
-    categories: PaginatedData;
-    filters?: Filters;
+    categories: Category[];
 }>();
 
 const emit = defineEmits<{
     edit: [category: Category];
 }>();
 
-const data = computed(() => props.categories.data);
-const search = ref(props.filters?.search || '');
-const sortBy = ref(props.filters?.sort || 'created_at');
-const sortDirection = ref(props.filters?.direction || 'desc');
-const perPage = ref(props.filters?.per_page || 10);
+const search = ref('');
+const collapsed = reactive(new Set<number>());
 
-// Debounced search function
-let searchTimeout: ReturnType<typeof setTimeout>;
-watch(search, (value) => {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        updateFilters();
-    }, 300);
-});
-
-function updateFilters() {
-    router.get('/categories', {
-        search: search.value || undefined,
-        sort: sortBy.value,
-        direction: sortDirection.value,
-        per_page: perPage.value,
-    }, {
-        preserveState: true,
-        preserveScroll: true,
+const flatTree = computed((): TreeNode[] => {
+    const childrenMap = new Map<number | null, Category[]>();
+    props.categories.forEach((cat) => {
+        const pid = cat.parent_id ?? null;
+        if (!childrenMap.has(pid)) childrenMap.set(pid, []);
+        childrenMap.get(pid)!.push(cat);
     });
-}
 
-function toggleSort(column: string) {
-    if (sortBy.value === column) {
-        sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
-    } else {
-        sortBy.value = column;
-        sortDirection.value = 'asc';
+    const result: TreeNode[] = [];
+
+    function traverse(parentId: number | null, depth: number) {
+        (childrenMap.get(parentId) ?? []).forEach((cat) => {
+            const hasChildren = (childrenMap.get(cat.id)?.length ?? 0) > 0;
+            result.push({ ...cat, depth, hasChildren });
+            traverse(cat.id, depth + 1);
+        });
     }
-    updateFilters();
-}
 
-function changePage(page: number) {
-    router.get('/categories', {
-        page,
-        search: search.value || undefined,
-        sort: sortBy.value,
-        direction: sortDirection.value,
-        per_page: perPage.value,
-    }, {
-        preserveState: true,
-        preserveScroll: true,
-    });
-}
-
-const columns: ColumnDef<Category>[] = [
-    {
-        accessorKey: 'name',
-        header: () => {
-            return h(
-                Button,
-                {
-                    variant: 'ghost',
-                    onClick: () => toggleSort('name'),
-                },
-                () => ['Name', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
-            );
-        },
-        cell: ({ row }) => h('div', { class: 'font-medium' }, row.getValue('name')),
-    },
-    {
-        accessorKey: 'description',
-        header: 'Description',
-        cell: ({ row }) => h('div', { class: 'text-muted-foreground' }, row.getValue('description')),
-    },
-    {
-        accessorKey: 'type',
-        header: () => {
-            return h(
-                Button,
-                {
-                    variant: 'ghost',
-                    onClick: () => toggleSort('type'),
-                },
-                () => ['Type', h(ArrowUpDown, { class: 'ml-2 h-4 w-4' })],
-            );
-        },
-        cell: ({ row }) => {
-            const type = row.getValue('type') as string;
-            return h(
-                'div',
-                {
-                    class: `inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        type === 'income'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                    }`,
-                },
-                type.charAt(0).toUpperCase() + type.slice(1),
-            );
-        },
-    },
-    {
-        id: 'actions',
-        header: 'Actions',
-        cell: ({ row }) => {
-            const category = row.original;
-            return h('div', { class: 'flex gap-2' }, [
-                h(
-                    Button,
-                    {
-                        variant: 'ghost',
-                        size: 'icon',
-                        onClick: () => editCategory(category),
-                    },
-                    () => h(Pencil, { class: 'h-4 w-4' }),
-                ),
-                h(
-                    Button,
-                    {
-                        variant: 'ghost',
-                        size: 'icon',
-                        onClick: () => deleteCategory(category),
-                    },
-                    () => h(Trash2, { class: 'h-4 w-4 text-destructive' }),
-                ),
-            ]);
-        },
-    },
-];
-
-const table = useVueTable({
-    get data() {
-        return data.value;
-    },
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    manualPagination: true,
-    manualSorting: true,
-    manualFiltering: true,
-    pageCount: props.categories.last_page,
+    traverse(null, 0);
+    return result;
 });
 
-function editCategory(category: Category) {
-    emit('edit', category);
+const visibleRows = computed((): TreeNode[] => {
+    const q = search.value.trim().toLowerCase();
+
+    if (q) {
+        const nodeById = new Map(flatTree.value.map((n) => [n.id, n]));
+        const toShow = new Set<number>();
+
+        flatTree.value.forEach((node) => {
+            if (
+                node.name.toLowerCase().includes(q) ||
+                (node.description ?? '').toLowerCase().includes(q)
+            ) {
+                toShow.add(node.id);
+                // Also show all ancestors so the tree context is clear
+                let current: TreeNode | undefined = node;
+                while (current?.parent_id != null) {
+                    toShow.add(current.parent_id);
+                    current = nodeById.get(current.parent_id);
+                }
+            }
+        });
+
+        return flatTree.value.filter((n) => toShow.has(n.id));
+    }
+
+    // No search — respect collapsed state
+    const hiddenSubtrees = new Set<number>();
+    return flatTree.value.filter((node) => {
+        if (node.parent_id != null && hiddenSubtrees.has(node.parent_id)) {
+            hiddenSubtrees.add(node.id);
+            return false;
+        }
+        if (collapsed.has(node.id)) {
+            hiddenSubtrees.add(node.id);
+        }
+        return true;
+    });
+});
+
+function toggleCollapse(id: number) {
+    if (collapsed.has(id)) {
+        collapsed.delete(id);
+    } else {
+        collapsed.add(id);
+    }
 }
 
-function deleteCategory(category: Category) {
-    if (confirm(`Are you sure you want to delete "${category.name}"?`)) {
-        router.delete(`/categories/${category.id}`, {
+function editCategory(node: TreeNode) {
+    emit('edit', node);
+}
+
+function deleteCategory(node: TreeNode) {
+    if (confirm(`Are you sure you want to delete "${node.name}"?`)) {
+        router.delete(`/categories/${node.id}`, {
             preserveScroll: true,
         });
     }
@@ -206,59 +122,92 @@ function deleteCategory(category: Category) {
 
 <template>
     <div class="w-full space-y-4">
-        <div class="flex items-center justify-between gap-4">
-            <Input
-                placeholder="Search categories..."
-                v-model="search"
-                class="max-w-sm"
-            />
-        </div>
+        <Input
+            placeholder="Search categories..."
+            v-model="search"
+            class="max-w-sm"
+        />
 
         <div class="rounded-md border">
             <Table>
                 <TableHeader>
-                    <TableRow
-                        v-for="headerGroup in table.getHeaderGroups()"
-                        :key="headerGroup.id"
-                    >
-                        <TableHead
-                            v-for="header in headerGroup.headers"
-                            :key="header.id"
-                        >
-                            <FlexRender
-                                v-if="!header.isPlaceholder"
-                                :render="header.column.columnDef.header"
-                                :props="header.getContext()"
-                            />
-                        </TableHead>
+                    <TableRow>
+                        <TableHead class="w-[35%]">Name</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead class="w-[110px]">Type</TableHead>
+                        <TableHead class="w-[100px]">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <template v-if="table.getRowModel().rows?.length">
-                        <TableRow
-                            v-for="row in table.getRowModel().rows"
-                            :key="row.id"
-                            :data-state="
-                                row.getIsSelected() ? 'selected' : undefined
-                            "
-                        >
-                            <TableCell
-                                v-for="cell in row.getVisibleCells()"
-                                :key="cell.id"
-                            >
-                                <FlexRender
-                                    :render="cell.column.columnDef.cell"
-                                    :props="cell.getContext()"
-                                />
+                    <template v-if="visibleRows.length">
+                        <TableRow v-for="node in visibleRows" :key="node.id">
+                            <TableCell>
+                                <div
+                                    class="flex items-center gap-1"
+                                    :style="{ paddingLeft: `${node.depth * 1.5}rem` }"
+                                >
+                                    <button
+                                        v-if="node.hasChildren"
+                                        class="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-muted"
+                                        @click="toggleCollapse(node.id)"
+                                    >
+                                        <ChevronDown
+                                            v-if="!collapsed.has(node.id)"
+                                            class="h-3.5 w-3.5 text-muted-foreground"
+                                        />
+                                        <ChevronRight
+                                            v-else
+                                            class="h-3.5 w-3.5 text-muted-foreground"
+                                        />
+                                    </button>
+                                    <span
+                                        v-else
+                                        class="flex h-5 w-5 shrink-0 items-center justify-center"
+                                    >
+                                        <Dot class="h-4 w-4 text-muted-foreground/50" />
+                                    </span>
+                                    <span :class="node.hasChildren ? 'font-medium' : ''">
+                                        {{ node.name }}
+                                    </span>
+                                </div>
+                            </TableCell>
+                            <TableCell class="text-sm text-muted-foreground">
+                                {{ node.description ?? '—' }}
+                            </TableCell>
+                            <TableCell>
+                                <div
+                                    :class="`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                        node.type === 'income'
+                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                                    }`"
+                                >
+                                    {{ node.type.charAt(0).toUpperCase() + node.type.slice(1) }}
+                                </div>
+                            </TableCell>
+                            <TableCell>
+                                <div class="flex gap-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        @click="editCategory(node)"
+                                    >
+                                        <Pencil class="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        @click="deleteCategory(node)"
+                                    >
+                                        <Trash2 class="h-4 w-4 text-destructive" />
+                                    </Button>
+                                </div>
                             </TableCell>
                         </TableRow>
                     </template>
                     <template v-else>
                         <TableRow>
-                            <TableCell
-                                :colspan="columns.length"
-                                class="h-24 text-center"
-                            >
+                            <TableCell colspan="4" class="h-24 text-center">
                                 No categories found.
                             </TableCell>
                         </TableRow>
@@ -266,32 +215,6 @@ function deleteCategory(category: Category) {
                 </TableBody>
             </Table>
         </div>
-
-        <div class="flex items-center justify-between space-x-2">
-            <div class="flex-1 text-sm text-muted-foreground">
-                Showing {{ props.categories.from || 0 }} to {{ props.categories.to || 0 }} of {{ props.categories.total }} category(ies)
-            </div>
-            <div class="space-x-2">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    :disabled="props.categories.current_page === 1"
-                    @click="changePage(props.categories.current_page - 1)"
-                >
-                    Previous
-                </Button>
-                <span class="text-sm text-muted-foreground">
-                    Page {{ props.categories.current_page }} of {{ props.categories.last_page }}
-                </span>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    :disabled="props.categories.current_page === props.categories.last_page"
-                    @click="changePage(props.categories.current_page + 1)"
-                >
-                    Next
-                </Button>
-            </div>
-        </div>
     </div>
 </template>
+
