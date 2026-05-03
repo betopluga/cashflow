@@ -27,7 +27,7 @@ interface Transaction {
     category?: {
         id: number;
         name: string;
-        type: 'income' | 'expense';
+        type: 'revenue' | 'expense';
     };
 }
 
@@ -165,7 +165,7 @@ const columns: ColumnDef<Transaction>[] = [
                 'div',
                 {
                     class: `inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        category.type === 'income'
+                        category.type === 'revenue'
                             ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                             : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
                     }`,
@@ -198,7 +198,7 @@ const columns: ColumnDef<Transaction>[] = [
                 'div',
                 {
                     class: `font-semibold ${
-                        type === 'income' ? 'text-green-600 dark:text-green-400' : 
+                        type === 'revenue' ? 'text-green-600 dark:text-green-400' : 
                         type === 'expense' ? 'text-red-600 dark:text-red-400' : 
                         ''
                     }`,

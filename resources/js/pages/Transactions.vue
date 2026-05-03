@@ -12,7 +12,7 @@ import { ref } from 'vue';
 interface Category {
     id: number;
     name: string;
-    type: 'income' | 'expense';
+    type: 'revenue' | 'expense';
     parent_id: number | null;
 }
 
@@ -78,7 +78,7 @@ function editTransaction(transaction: Transaction) {
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight">Transactions</h1>
                     <p class="text-muted-foreground">
-                        Track your income and expenses
+                        Track your revenue and expenses
                     </p>
                 </div>
                 <Button @click="createTransaction">

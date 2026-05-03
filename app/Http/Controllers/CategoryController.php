@@ -42,7 +42,7 @@ class CategoryController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'type' => 'required|in:income,expense',
+            'type' => 'required|in:revenue,expense',
             'parent_id' => [
                 'nullable',
                 'exists:categories,id',
@@ -87,7 +87,7 @@ class CategoryController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:500',
-            'type' => 'required|in:income,expense',
+            'type' => 'required|in:revenue,expense',
             'parent_id' => [
                 'nullable',
                 'exists:categories,id',

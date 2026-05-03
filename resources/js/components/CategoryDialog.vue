@@ -26,14 +26,14 @@ interface Category {
     id?: number;
     name: string;
     description: string | null;
-    type: 'income' | 'expense';
+    type: 'revenue' | 'expense';
     parent_id: number | null;
 }
 
 interface ParentCandidate {
     id: number;
     name: string;
-    type: 'income' | 'expense';
+    type: 'revenue' | 'expense';
     parent_id: number | null;
 }
 
@@ -62,7 +62,7 @@ const dialogDescription = computed(() =>
 const form = ref({
     name: '',
     description: '',
-    type: 'income' as 'income' | 'expense',
+    type: 'revenue' as 'revenue' | 'expense',
     parent_id: null as number | null,
 });
 
@@ -122,7 +122,7 @@ function resetForm() {
     form.value = {
         name: '',
         description: '',
-        type: 'income',
+        type: 'revenue',
         parent_id: null,
     };
     errors.value = {};
@@ -219,7 +219,7 @@ function handleSubmit() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="expense">Expense</SelectItem>
-                            <SelectItem value="income">Income</SelectItem>
+                            <SelectItem value="revenue">Revenue</SelectItem>
                         </SelectContent>
                     </Select>
                     <p v-if="form.parent_id" class="text-xs text-muted-foreground">

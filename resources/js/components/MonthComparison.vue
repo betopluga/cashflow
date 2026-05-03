@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { ChevronDown, ChevronRight } from 'lucide-vue-next';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const PER_PAGE = 10;
@@ -7,17 +8,30 @@ const PER_PAGE = 10;
 // --- Controls ---
 const years = ref<number[]>([]);
 const selectedYear = ref(new Date().getFullYear());
-const type = ref<'income' | 'expense'>('expense');
+const type = ref<'revenue' | 'expense'>('expense');
 
 const now = new Date();
 const monthA = ref(now.getMonth() === 0 ? 0 : now.getMonth() - 1); // 0-based, older month
 const monthB = ref(now.getMonth()); // 0-based, newer month
 
 // --- Data ---
-interface CategoryRow { id: number; name: string; months: number[] }
+interface CategoryRow { id: number; name: string; months: number[]; parent_id: number | null; }
+
+interface DisplayRow {
+    id: number;
+    name: string;
+    parent_id: number | null;
+    depth: number;
+    hasChildren: boolean;
+    valA: number;
+    valB: number;
+    diff: { label: string; color: string; pct: number };
+}
+
 const allCategories = ref<CategoryRow[]>([]);
 const loading = ref(false);
 const page = ref(1);
+const expanded = reactive(new Set<number>());
 
 // --- Per-month totals (sum of all categories for that month index) ---
 const monthTotals = computed(() =>
@@ -42,39 +56,86 @@ const monthBOptions = computed(() =>
     }))
 );
 
-// --- Derived rows (filter, sort, paginate) ---
+// --- Derived rows ---
 const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 
-function diffInfo(a: number, b: number, catType: 'income' | 'expense') {
+function diffInfo(a: number, b: number, catType: 'revenue' | 'expense') {
     if (a === 0 && b === 0) return { label: '—', color: 'text-neutral-400', pct: 0 };
-    if (a === 0) return { label: '↑ new', color: catType === 'income' ? 'text-green-500' : 'text-red-500', pct: Infinity };
-    if (b === 0) return { label: '↓ -100%', color: catType === 'income' ? 'text-red-500' : 'text-green-500', pct: 100 };
+    if (a === 0) return { label: '↑ new', color: catType === 'revenue' ? 'text-green-500' : 'text-red-500', pct: Infinity };
+    if (b === 0) return { label: '↓ -100%', color: catType === 'revenue' ? 'text-red-500' : 'text-green-500', pct: 100 };
     const pct = ((b - a) / a) * 100;
     const up  = pct > 0;
     const arrow = up ? '↑' : '↓';
-    const color = (up && catType === 'income') || (!up && catType === 'expense')
+    const color = (up && catType === 'revenue') || (!up && catType === 'expense')
         ? 'text-green-500'
         : 'text-red-500';
     return { label: `${arrow} ${Math.abs(pct).toFixed(1)}%`, color, pct: Math.abs(pct) };
 }
 
-const filteredRows = computed(() => {
-    return allCategories.value
-        .filter(c => c.months[monthA.value] !== 0 || c.months[monthB.value] !== 0)
-        .map(c => ({
-            ...c,
-            valA: c.months[monthA.value],
-            valB: c.months[monthB.value],
-            diff: diffInfo(c.months[monthA.value], c.months[monthB.value], type.value),
-        }))
-        .sort((x, y) => y.diff.pct - x.diff.pct);
+// Build a collapsible tree sorted by biggest diff at each level
+const visibleRows = computed((): DisplayRow[] => {
+    const childrenMap = new Map<number | null, CategoryRow[]>();
+    allCategories.value.forEach(c => {
+        const pid = c.parent_id ?? null;
+        if (!childrenMap.has(pid)) childrenMap.set(pid, []);
+        childrenMap.get(pid)!.push(c);
+    });
+
+    // Recursively sum own + all descendants for a given month index
+    function summaryOf(cat: CategoryRow): number[] {
+        const s = [...cat.months];
+        (childrenMap.get(cat.id) ?? []).forEach(child => {
+            summaryOf(child).forEach((v, i) => { s[i] += v; });
+        });
+        return s;
+    }
+
+    // Build [parentRow, ...childRows] for a category recursively
+    function buildGroup(cat: CategoryRow, depth: number): DisplayRow[] {
+        const children = childrenMap.get(cat.id) ?? [];
+        const hasChildren = children.length > 0;
+        const display = hasChildren ? summaryOf(cat) : cat.months;
+        const valA = display[monthA.value];
+        const valB = display[monthB.value];
+        if (valA === 0 && valB === 0) return [];
+
+        const row: DisplayRow = {
+            id: cat.id, name: cat.name, parent_id: cat.parent_id,
+            depth, hasChildren, valA, valB,
+            diff: diffInfo(valA, valB, type.value),
+        };
+
+        if (!hasChildren || !expanded.has(cat.id)) return [row];
+
+        const childGroups = children
+            .map(c => buildGroup(c, depth + 1))
+            .filter(g => g.length > 0)
+            .sort((a, b) => b[0].diff.pct - a[0].diff.pct);
+
+        return [row, ...childGroups.flat()];
+    }
+
+    const allIds = new Set(allCategories.value.map(c => c.id));
+    const roots = allCategories.value.filter(c => c.parent_id === null || !allIds.has(c.parent_id));
+
+    return roots
+        .map(root => buildGroup(root, 0))
+        .filter(g => g.length > 0)
+        .sort((a, b) => b[0].diff.pct - a[0].diff.pct)
+        .flat();
 });
 
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredRows.value.length / PER_PAGE)));
+function toggleExpand(id: number) {
+    if (expanded.has(id)) expanded.delete(id);
+    else expanded.add(id);
+    page.value = 1;
+}
+
+const totalPages = computed(() => Math.max(1, Math.ceil(visibleRows.value.length / PER_PAGE)));
 
 const pagedRows = computed(() => {
     const start = (page.value - 1) * PER_PAGE;
-    return filteredRows.value.slice(start, start + PER_PAGE);
+    return visibleRows.value.slice(start, start + PER_PAGE);
 });
 
 // --- Fetch ---
@@ -103,6 +164,7 @@ async function fetchBreakdown() {
 
 function resetAndFetch() {
     page.value = 1;
+    expanded.clear();
     fetchBreakdown();
 }
 
@@ -136,11 +198,11 @@ onMounted(async () => {
                 >Expense</button>
                 <button
                     class="px-3 py-1 transition-colors"
-                    :class="type === 'income'
+                    :class="type === 'revenue'
                         ? 'bg-neutral-200 font-medium text-neutral-900 dark:bg-neutral-700 dark:text-neutral-100'
                         : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'"
-                    @click="type = 'income'"
-                >Income</button>
+                    @click="type = 'revenue'"
+                >Revenue</button>
             </div>
 
             <!-- Year -->
@@ -198,7 +260,7 @@ onMounted(async () => {
                     </thead>
                     <tbody>
                         <!-- No data -->
-                        <tr v-if="filteredRows.length === 0">
+                        <tr v-if="visibleRows.length === 0">
                             <td colspan="4" class="py-8 text-center text-neutral-400 dark:text-neutral-500">
                                 No data for the selected period.
                             </td>
@@ -210,7 +272,23 @@ onMounted(async () => {
                             :key="row.id"
                             class="border-b border-neutral-100 last:border-0 dark:border-neutral-800"
                         >
-                            <td class="py-2 text-neutral-700 dark:text-neutral-200">{{ row.name }}</td>
+                            <td class="py-2 text-neutral-700 dark:text-neutral-200">
+                                <div
+                                    class="flex items-center gap-1"
+                                    :style="{ paddingLeft: `${row.depth * 1.25}rem` }"
+                                >
+                                    <button
+                                        v-if="row.hasChildren"
+                                        class="flex h-5 w-5 shrink-0 items-center justify-center rounded hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                                        @click="toggleExpand(row.id)"
+                                    >
+                                        <ChevronDown v-if="expanded.has(row.id)" class="h-3.5 w-3.5 text-neutral-400" />
+                                        <ChevronRight v-else class="h-3.5 w-3.5 text-neutral-400" />
+                                    </button>
+                                    <span v-else class="w-5 shrink-0" />
+                                    <span :class="row.hasChildren ? 'font-medium' : 'text-neutral-600 dark:text-neutral-300'">{{ row.name }}</span>
+                                </div>
+                            </td>
                             <td class="py-2 text-right text-neutral-600 dark:text-neutral-300">{{ fmt(row.valA) }}</td>
                             <td class="py-2 text-right text-neutral-600 dark:text-neutral-300">{{ fmt(row.valB) }}</td>
                             <td class="py-2 text-right font-medium" :class="row.diff.color">{{ row.diff.label }}</td>

@@ -88,8 +88,8 @@ async function fetchGraph() {
         const res = await fetch(`/transactions/graph?year=${selectedYear.value}`, {
             headers: { Accept: 'application/json' },
         });
-        const data: { month: number; income: number; expenses: number }[] = await res.json();
-        const newBalances = data.map((d) => parseFloat((d.income - d.expenses).toFixed(2)));
+        const data: { month: number; revenue: number; expenses: number }[] = await res.json();
+        const newBalances = data.map((d) => parseFloat((d.revenue - d.expenses).toFixed(2)));
         balanceData.value = newBalances;
         chartData.value = {
             labels: MONTHS,

@@ -13,7 +13,7 @@ interface Category {
     id: number;
     name: string;
     description: string | null;
-    type: 'income' | 'expense';
+    type: 'revenue' | 'expense';
     parent_id: number | null;
     created_at: string;
 }
@@ -21,7 +21,7 @@ interface Category {
 interface ParentCandidate {
     id: number;
     name: string;
-    type: 'income' | 'expense';
+    type: 'revenue' | 'expense';
     parent_id: number | null;
 }
 
@@ -60,7 +60,7 @@ function editCategory(category: Category) {
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight">Categories</h1>
                     <p class="text-muted-foreground">
-                        Manage your income and expense categories
+                        Manage your revenue and expense categories
                     </p>
                 </div>
                 <Button @click="createCategory">

@@ -6,11 +6,11 @@ const monthValue = ref(
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
 );
 
-const income = ref(0);
+const revenue = ref(0);
 const expenses = ref(0);
 const loading = ref(false);
 
-const balance = () => income.value - expenses.value;
+const balance = () => revenue.value - expenses.value;
 
 const fmt = (n: number) =>
     n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -23,10 +23,10 @@ async function fetchTotals() {
             headers: { Accept: 'application/json' },
         });
         const data = await res.json();
-        income.value = data.income;
+        revenue.value = data.revenue;
         expenses.value = data.expenses;
     } catch {
-        income.value = 0;
+        revenue.value = 0;
         expenses.value = 0;
     } finally {
         loading.value = false;
@@ -78,8 +78,8 @@ onMounted(fetchTotals);
         <!-- Totals -->
         <div v-else class="flex flex-col gap-2">
             <div class="flex items-center justify-between">
-                <span class="text-sm text-neutral-500 dark:text-neutral-400">Income</span>
-                <span class="font-semibold text-green-600 dark:text-green-400">{{ fmt(income) }}</span>
+                <span class="text-sm text-neutral-500 dark:text-neutral-400">Revenue</span>
+                <span class="font-semibold text-green-600 dark:text-green-400">{{ fmt(revenue) }}</span>
             </div>
             <div class="flex items-center justify-between">
                 <span class="text-sm text-neutral-500 dark:text-neutral-400">Expenses</span>

@@ -25,14 +25,14 @@ import { computed, ref, watch } from 'vue';
 interface Category {
     id: number;
     name: string;
-    type: 'income' | 'expense';
+    type: 'revenue' | 'expense';
     parent_id: number | null;
 }
 
 interface CategoryTreeNode {
     id: number;
     name: string;
-    type: 'income' | 'expense';
+    type: 'revenue' | 'expense';
     depth: number;
     isLeaf: boolean;
 }

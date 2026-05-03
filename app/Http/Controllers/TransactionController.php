@@ -147,7 +147,7 @@ class TransactionController extends Controller
             ->pluck('total', 'type');
 
         return response()->json([
-            'income'   => round((float) ($totals['income']   ?? 0), 2),
+            'revenue'  => round((float) ($totals['revenue'] ?? 0), 2),
             'expenses' => round((float) ($totals['expense'] ?? 0), 2),
         ]);
     }
@@ -181,11 +181,11 @@ class TransactionController extends Controller
         $months = [];
         for ($m = 1; $m <= 12; $m++) {
             $group   = $grouped->get($m, collect());
-            $income  = $group->filter(fn($t) => $t->category?->type === 'income')->sum('amount');
+            $revenue = $group->filter(fn($t) => $t->category?->type === 'revenue')->sum('amount');
             $expense = $group->filter(fn($t) => $t->category?->type === 'expense')->sum('amount');
             $months[] = [
                 'month'    => $m,
-                'income'   => round((float) $income,  2),
+                'revenue'  => round((float) $revenue, 2),
                 'expenses' => round((float) $expense, 2),
             ];
         }
@@ -201,26 +201,29 @@ class TransactionController extends Controller
         $year = $request->integer('year', now()->year);
         $type = $request->string('type', 'expense')->toString();
 
-        $transactions = Transaction::with('category')
-            ->whereYear('date', $year)
+        $transactions = Transaction::whereYear('date', $year)
             ->whereHas('category', fn($q) => $q->where('type', $type))
             ->get();
 
         $grouped = $transactions->groupBy('category_id');
 
-        $result = $grouped->map(function ($items) {
-            $category = $items->first()->category;
-            $months   = array_fill(0, 12, 0.0);
+        // Include ALL categories of this type so parent categories with no
+        // direct transactions still appear in the tree.
+        $categories = Category::where('type', $type)->get();
 
-            foreach ($items as $t) {
+        $result = $categories->map(function ($category) use ($grouped) {
+            $months = array_fill(0, 12, 0.0);
+
+            foreach ($grouped->get($category->id, collect()) as $t) {
                 $idx          = (int) $t->date->format('n') - 1;
                 $months[$idx] = round($months[$idx] + (float) $t->amount, 2);
             }
 
             return [
-                'id'     => $category->id,
-                'name'   => $category->name,
-                'months' => $months,
+                'id'        => $category->id,
+                'name'      => $category->name,
+                'parent_id' => $category->parent_id,
+                'months'    => $months,
             ];
         })->values();
 
